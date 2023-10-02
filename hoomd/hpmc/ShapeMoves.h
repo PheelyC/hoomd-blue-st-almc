@@ -663,15 +663,15 @@ template<class Shape> class TargetedShapeMoveBase : public ShapeMoveBase<Shape>
         return m_sc;
         }
 
-    void setTargetType(Scalar target_type)
-        {
-        target_t = target_type;
-        }
+	void setTargetType(int t_type)
+		{
+		target_type = t_type;
+		}
 
-    Scalar getTargetType()
-        {
-        return target_t;
-        }
+	int getTargetType()
+		{
+		return target_type;
+		}
 
 	Scalar score(Scalar target_1,
 				 Scalar target_2,
@@ -686,7 +686,23 @@ template<class Shape> class TargetedShapeMoveBase : public ShapeMoveBase<Shape>
 
 	protected:
 	Scalar m_sc; // shape move score
-	Scalar target_t; // Type of shape move
+	int target_type;
+	};
+
+template<int target> class Targets
+	{
+	};
+
+template<>
+class Targets<0>
+	{
+	// Target type 0: Tr(I)
+	public:
+
+	int test_1()
+		{
+		return 0;
+		}
 	};
 
 template<class Shape> class TargetedShapeMove : public TargetedShapeMoveBase<Shape>
@@ -792,24 +808,13 @@ class TargetedShapeMove<ShapeConvexPolyhedron> : public TargetedShapeMoveBase<Sh
 							  const typename ShapeConvexPolyhedron::param_type& shape_old,
 							  const Scalar& iold)
 		{
-		// Write a function template for target types
-		return 0;
+		const int target_tmp = 0;
+		Targets<target_tmp> compute_target;
+		return compute_target.test_1();
 		}
-
-	template<int target = 0>
-	void computeTarget();
 
 	private:
 	std::vector<Scalar> m_step_size_backup;
-	};
-
-// template<>
-// void TargetedShapeMove<ShapeConvexPolyhedron>::computeTarget()
-	// {
-	// }
-
-template<class Shape, int Tester> class TestShapeMoveBase : public ShapeMoveBase<Shape>
-	{
 	};
 
 
