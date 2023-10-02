@@ -53,6 +53,7 @@ void export_convex_polyhedron(pybind11::module& m)
     ;
     export_ElasticShapeMove<ShapeConvexPolyhedron>(m, "ElasticConvexPolyhedron");
     export_ConvexPolyhedronVertexShapeMove(m, "VertexConvexPolyhedron");
+    export_TargetedShapeMove<ShapeConvexPolyhedron>(m, "TargetedConvexPolyhedron");
 
     export_ExternalFieldInterface<ShapeConvexPolyhedron>(m, "ExternalFieldConvexPolyhedron");
     export_HarmonicField<ShapeConvexPolyhedron>(m, "ExternalFieldHarmonicConvexPolyhedron");

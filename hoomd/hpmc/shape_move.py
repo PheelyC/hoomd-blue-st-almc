@@ -17,6 +17,7 @@ from . import _hpmc
 from hoomd.hpmc import integrate
 from hoomd.data.parameterdicts import ParameterDict, TypeParameterDict
 from hoomd.data.typeparam import TypeParameter
+from hoomd.logging import log
 import numpy
 
 
@@ -332,3 +333,25 @@ class Vertex(ShapeMove):
                                          param_dict=TypeParameterDict(
                                              float, len_keys=1))
         self._add_typeparam(typeparam_volume)
+
+class Targeted(ShapeMove):
+    """Apply shape moves on particle vertices with a scoring system
+    """
+
+    _suported_shapes = {'ConvexPolyhedron'}
+
+    def __init__(self, default_step_size=None, vertex_move_probability=1, move_score=0):
+        super().__init__(default_step_size)
+        param_dict = ParameterDict(
+            vertex_move_probability=float(vertex_move_probability),
+            move_score=float(move_score))
+        self._param_dict.update(param_dict)
+        typeparam_volume = TypeParameter('volume',
+                                         type_kind='particle_types',
+                                         param_dict=TypeParameterDict(
+                                             float, len_keys=1))
+        self._add_typeparam(typeparam_volume)
+
+    @log(category='scalar', requires_run=False)
+    def move_score(self):
+        return self._cpp_obj.getMoveScore()

@@ -642,6 +642,177 @@ template<> class ElasticShapeMove<ShapeEllipsoid> : public ElasticShapeMoveBase<
     private:
     };
 
+template<class Shape> class TargetedShapeMoveBase : public ShapeMoveBase<Shape>
+	{
+	public:
+    TargetedShapeMoveBase(std::shared_ptr<SystemDefinition> sysdef,
+                          std::shared_ptr<IntegratorHPMCMono<Shape>> mc)
+        : ShapeMoveBase<Shape>(sysdef, mc)
+        {
+        }
+
+    typedef typename Shape::param_type param_type;
+
+    void setMoveScore(Scalar move_score)
+        {
+        m_sc = move_score;
+        }
+
+    Scalar getMoveScore()
+        {
+        return m_sc;
+        }
+
+    void setTargetType(Scalar target_type)
+        {
+        target_t = target_type;
+        }
+
+    Scalar getTargetType()
+        {
+        return target_t;
+        }
+
+	Scalar score(Scalar target_1,
+				 Scalar target_2,
+				 Scalar param_1,
+				 Scalar param_2,
+				 Scalar scale_1,
+				 Scalar scale_2)
+		{
+		// score shape based on shape parameters
+		return (pow(param_1 - target_1, 2) * scale_1) + (pow(param_2 - target_2, 2) * scale_2);
+		}
+
+	protected:
+	Scalar m_sc; // shape move score
+	Scalar target_t; // Type of shape move
+	};
+
+template<class Shape> class TargetedShapeMove : public TargetedShapeMoveBase<Shape>
+	{
+	};
+
+template<>
+class TargetedShapeMove<ShapeConvexPolyhedron> : public TargetedShapeMoveBase<ShapeConvexPolyhedron>
+	{
+	public:
+	typedef typename ShapeConvexPolyhedron::param_type param_type;
+
+	TargetedShapeMove(std::shared_ptr<SystemDefinition> sysdef,
+					  std::shared_ptr<IntegratorHPMCMono<ShapeConvexPolyhedron>> mc)
+		: TargetedShapeMoveBase<ShapeConvexPolyhedron>(sysdef, mc)
+		{
+		this->m_centroids.resize(this->m_ntypes, vec3<Scalar>(0, 0, 0));
+		initializeMassProperties();
+		}
+
+	void initializeMassProperties()
+		{
+		auto& mc_params = this->m_mc->getParams();
+		for (unsigned int i = 0; i < this->m_ntypes; i++)
+			{
+			detail::MassProperties<ShapeConvexPolyhedron> mp(mc_params[i]);
+			this->m_centroids[i] = mp.getCenterOfMass();
+			}
+		}
+
+	void setVolume(std::string typ, Scalar volume)
+		{
+		unsigned int typid = getValidateType(typ);
+		this->m_volume[typid] = volume;
+		auto& mc_params = this->m_mc->getParams();
+		param_type shape = mc_params[typid];
+		detail::MassProperties<ShapeConvexPolyhedron> mp(shape);
+		Scalar current_volume = mp.getVolume();
+		vec3<Scalar> dr = this->m_centroids[typid] - mp.getCenterOfMass();
+		ShortReal scale = (ShortReal)fast::pow(volume / current_volume, 1.0 / 3.0);
+		this->scaleParticleVolume(shape, dr, scale);
+		this->m_mc->setParam(typid, shape);
+		}
+
+	void scaleParticleVolume(param_type& shape, vec3<Scalar> dr, ShortReal scale)
+		{
+		Scalar rsq = 0.0;
+		for (unsigned int i = 0; i < shape.N; i++)
+			{
+			shape.x[i] += static_cast<ShortReal>(dr.x);
+			shape.x[i] *= scale;
+			shape.y[i] += static_cast<ShortReal>(dr.y);
+			shape.y[i] *= scale;
+			shape.z[i] += static_cast<ShortReal>(dr.z);
+			shape.z[i] *= scale;
+			vec3<Scalar> vert(shape.x[i], shape.y[i], shape.z[i]);
+			rsq = fmax(rsq, dot(vert, vert));
+			}
+		shape.diameter = ShortReal(2.0 * fast::sqrt(rsq));
+		}
+
+	void prepare(uint64_t timestep)
+		{
+		m_step_size_backup = this->m_step_size;
+		}
+
+	void update_shape(uint64_t timestep,
+					  const unsigned int& type_id,
+					  param_type& shape,
+					  hoomd::RandomGenerator& rng)
+		{
+		// perturb the shape.
+		for (unsigned int i = 0; i < shape.N; i++)
+			{
+			if (hoomd::detail::generate_canonical<double>(rng) < this->m_move_probability)
+				{
+				vec3<Scalar> vert(shape.x[i], shape.y[i], shape.z[i]);
+				move_translate(vert, rng, this->m_step_size[type_id], 3);
+				shape.x[i] = static_cast<ShortReal>(vert.x);
+				shape.y[i] = static_cast<ShortReal>(vert.y);
+				shape.z[i] = static_cast<ShortReal>(vert.z);
+				}
+			}
+		detail::MassProperties<ShapeConvexPolyhedron> mp(shape);
+		Scalar volume = mp.getVolume();
+		vec3<Scalar> dr = this->m_centroids[type_id] - mp.getCenterOfMass();
+		ShortReal scale
+			= static_cast<ShortReal>(fast::pow(this->m_volume[type_id] / volume, 1.0 / 3.0));
+		scaleParticleVolume(shape, dr, scale);
+		this->m_step_size[type_id] *= scale;
+		}
+
+	void retreat(uint64_t timestep, unsigned int type)
+		{
+		this->m_step_size[type] = m_step_size_backup[type];
+		}
+
+	Scalar computeLogBoltmann(uint64_t timestep,
+							  const unsigned int& N,
+							  const unsigned int type_id,
+							  const typename ShapeConvexPolyhedron::param_type& shape_new,
+							  const Scalar& inew,
+							  const typename ShapeConvexPolyhedron::param_type& shape_old,
+							  const Scalar& iold)
+		{
+		// Write a function template for target types
+		return 0;
+		}
+
+	template<int target = 0>
+	void computeTarget();
+
+	private:
+	std::vector<Scalar> m_step_size_backup;
+	};
+
+// template<>
+// void TargetedShapeMove<ShapeConvexPolyhedron>::computeTarget()
+	// {
+	// }
+
+template<class Shape, int Tester> class TestShapeMoveBase : public ShapeMoveBase<Shape>
+	{
+	};
+
+
 namespace detail
     {
 
@@ -702,6 +873,25 @@ inline void export_ElasticShapeMove(pybind11::module& m, const std::string& name
         .def("setReferenceShape", &ElasticShapeMove<Shape>::setReferenceShape)
         .def("getReferenceShape", &ElasticShapeMove<Shape>::getReferenceShape);
     }
+
+template<class Shape>
+inline void export_TargetedShapeMove(pybind11::module& m, const std::string& name)
+	{
+	pybind11::class_<TargetedShapeMove<Shape>,
+					 ShapeMoveBase<Shape>,
+					 std::shared_ptr<TargetedShapeMove<Shape>>>(m, name.c_str())
+		.def_property("vertex_move_probability",
+					  &TargetedShapeMove<Shape>::getMoveProbability,
+					  &TargetedShapeMove<Shape>::setMoveProbability)
+		.def(pybind11::init<std::shared_ptr<SystemDefinition>,
+							std::shared_ptr<IntegratorHPMCMono<Shape>>>())
+		.def_property("move_score",
+					  &TargetedShapeMove<Shape>::getMoveScore,
+					  &TargetedShapeMove<Shape>::setMoveScore)
+		.def_property("target_type",
+					  &TargetedShapeMove<Shape>::getTargetType,
+					  &TargetedShapeMove<Shape>::setTargetType);
+	}
 
     } // namespace detail
     } // namespace hpmc
