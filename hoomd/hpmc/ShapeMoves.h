@@ -713,17 +713,6 @@ template<class Shape> class TargetedShapeMoveBase : public ShapeMoveBase<Shape>
 		return m_scale_2;
 		}
 
-	Scalar score(Scalar target_1,
-				 Scalar target_2,
-				 Scalar param_1,
-				 Scalar param_2,
-				 Scalar scale_1 = 1,
-				 Scalar scale_2 = 1)
-		{
-		// score shape based on shape parameters
-		return (pow(param_1 - target_1, 2) * scale_1) + (pow(param_2 - target_2, 2) * scale_2);
-		}
-
 	protected:
 	Scalar m_sc; // shape move score
 	int m_target_type;
@@ -735,6 +724,52 @@ template<class Shape> class TargetedShapeMoveBase : public ShapeMoveBase<Shape>
 
 template<class Shape> class TargetedShapeMove : public TargetedShapeMoveBase<Shape>
 	{
+	};
+
+template<int t_type> class TargetsBase
+	{
+	public:
+
+	Scalar score(Scalar target_1,
+				 Scalar target_2,
+				 Scalar param_1,
+				 Scalar param_2,
+				 Scalar scale_1 = 1,
+				 Scalar scale_2 = 1)
+		{
+		// score shape based on shape parameters
+		return (pow(param_1 - target_1, 2) * scale_1) + (pow(param_2 - target_2, 2) * scale_2);
+		}
+
+	virtual Scalar computeScore(int target_type,
+								const typename ShapeConvexPolyhedron::param_type& shape,
+								Scalar t_1, Scalar t_2,
+								Scalar s_1, Scalar s_2)
+		{
+		return 0.0;
+		}
+	};
+
+template<int t_type> class Targets : public TargetsBase<t_type>
+	{
+	};
+
+template<>
+class Targets<1> : public TargetsBase<1>
+	{
+	public:
+	// Target is Trace of moment of inertia only
+	Scalar computeScore(int target_type,
+						const typename ShapeConvexPolyhedron::param_type& shape,
+						Scalar t_1, Scalar t_2,
+						Scalar s_1, Scalar s_2)
+		{
+		detail::MassProperties<ShapeConvexPolyhedron> mp_tar(shape);
+		std::vector<Scalar> inert = mp_tar.getInertiaTensor();
+		// Compute trace
+		Scalar trI = inert[0] + inert[1] + inert[2];
+		return score(t_1, 0, trI, 0, s_1, s_2);
+		}
 	};
 
 template<>
@@ -836,43 +871,20 @@ class TargetedShapeMove<ShapeConvexPolyhedron> : public TargetedShapeMoveBase<Sh
 							  const typename ShapeConvexPolyhedron::param_type& shape_old,
 							  const Scalar& iold)
 		{
-		Scalar score_pre = selectTarget(m_target_type, shape_old,
-										m_target_1, m_target_2,
-										m_scale_1, m_scale_2);
-		Scalar score_post = selectTarget(m_target_type, shape_new,
-										 m_target_1, m_target_2,
-										 m_scale_1, m_scale_2);
-		setMoveScore(score_pre);
+		Targets<1> Scorer;
+		Scalar score_pre = Scorer.computeScore(m_target_type, shape_old,
+											   m_target_1, m_target_2,
+											   m_scale_1, m_scale_2);
+		Scalar score_post = Scorer.computeScore(m_target_type, shape_new,
+											    m_target_1, m_target_2,
+								    		    m_scale_1, m_scale_2);
+		setMoveScore(score_pre); // To keep track move score in logger
 		return score_pre - score_post;
 		}
 
 	private:
 	std::vector<Scalar> m_step_size_backup;
-
-	// Choosing target types
-	Scalar selectTarget(int target_type,
-						const typename ShapeConvexPolyhedron::param_type& shape,
-						Scalar t_1, Scalar t_2,
-						Scalar s_1, Scalar s_2)
-		{
-		switch (target_type)
-			{
-			case 1: // Only Tr(I)
-				{
-				detail::MassProperties<ShapeConvexPolyhedron> mp_tar(shape);
-				std::vector<Scalar> inert = mp_tar.getInertiaTensor();
-				// Compute trace
-				Scalar trI = inert[0] + inert[1] + inert[2];
-				return score(t_1, 0, trI, 0, s_1, s_2);
-				}
-			default:
-				// Invalid target type, perform normal vertex move
-				std::cout << "Invalid target type" << std::endl;
-				return 0;
-			}
-		}
 	};
-
 
 namespace detail
     {
