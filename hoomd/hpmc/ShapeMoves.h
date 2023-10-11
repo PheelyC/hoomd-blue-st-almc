@@ -957,7 +957,13 @@ inline void export_TargetedShapeMove(pybind11::module& m, const std::string& nam
 					  &TargetedShapeMove<Shape>::setTarget1)
 		.def_property("target_2",
 					  &TargetedShapeMove<Shape>::getTarget2,
-					  &TargetedShapeMove<Shape>::setTarget2);
+					  &TargetedShapeMove<Shape>::setTarget2)
+		.def_property("scale_1",
+					  &TargetedShapeMove<Shape>::getScale1,
+					  &TargetedShapeMove<Shape>::setScale1)
+		.def_property("scale_2",
+					  &TargetedShapeMove<Shape>::getScale2,
+					  &TargetedShapeMove<Shape>::setScale2);
 	}
 
     } // namespace detail
