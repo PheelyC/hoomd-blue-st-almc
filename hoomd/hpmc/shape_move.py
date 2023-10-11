@@ -340,11 +340,21 @@ class Targeted(ShapeMove):
 
     _suported_shapes = {'ConvexPolyhedron'}
 
-    def __init__(self, default_step_size=None, vertex_move_probability=1, move_score=0):
+    def __init__(self, target_type,
+                 target_1, target_2,
+                 scale_1=1.,
+                 scale_2=1.,
+                 default_step_size=None, vertex_move_probability=1,
+                 move_score=0):
         super().__init__(default_step_size)
         param_dict = ParameterDict(
             vertex_move_probability=float(vertex_move_probability),
-            move_score=float(move_score))
+            move_score=float(move_score),
+            target_type=int(target_type),
+            target_1=float(target_1),
+            target_2=float(target_2),
+            scale_1=float(scale_1),
+            scale_2=float(scale_2))
         self._param_dict.update(param_dict)
         typeparam_volume = TypeParameter('volume',
                                          type_kind='particle_types',
