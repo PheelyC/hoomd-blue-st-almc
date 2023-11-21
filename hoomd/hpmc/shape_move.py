@@ -334,23 +334,22 @@ class Vertex(ShapeMove):
                                              float, len_keys=1))
         self._add_typeparam(typeparam_volume)
 
-class Targeted(ShapeMove):
+class Targeted1(ShapeMove):
     """Apply shape moves on particle vertices with a scoring system
     """
 
     _suported_shapes = {'ConvexPolyhedron'}
 
-    def __init__(self, target_type,
+    def __init__(self,
                  target_1, target_2,
                  scale_1=1.,
                  scale_2=1.,
-                 default_step_size=None, vertex_move_probability=1,
+                 default_step_size=None, vertex_move_probability=0.1,
                  move_score=0):
         super().__init__(default_step_size)
         param_dict = ParameterDict(
             vertex_move_probability=float(vertex_move_probability),
             move_score=float(move_score),
-            target_type=int(target_type),
             target_1=float(target_1),
             target_2=float(target_2),
             scale_1=float(scale_1),
