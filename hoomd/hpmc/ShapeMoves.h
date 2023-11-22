@@ -856,6 +856,37 @@ class Targeted1ShapeMove<ShapeConvexPolyhedron> : public TargetedShapeMoveBase<S
 		}
 	};
 
+template<class Shape> class Targeted2ShapeMove : public TargetedShapeMoveBase<Shape>
+	{
+	};
+
+template<>
+class Targeted2ShapeMove<ShapeConvexPolyhedron> : public TargetedShapeMoveBase<ShapeConvexPolyhedron>
+	{
+	public:
+	typedef typename ShapeConvexPolyhedron::param_type param_type;
+
+	Targeted2ShapeMove(std::shared_ptr<SystemDefinition> sysdef,
+					   std::shared_ptr<IntegratorHPMCMono<ShapeConvexPolyhedron>> mc)
+		: TargetedShapeMoveBase<ShapeConvexPolyhedron>(sysdef, mc)
+		{
+		this->m_centroids.resize(this->m_ntypes, vec3<Scalar>(0, 0, 0));
+		initializeMassProperties();
+		}
+
+	// Target is r_c
+	Scalar computeScore(const typename ShapeConvexPolyhedron::param_type& shape,
+						Scalar t_1, Scalar t_2,
+						Scalar s_1, Scalar s_2)
+		{
+		detail::MassProperties<ShapeConvexPolyhedron> mp_tar(shape);
+		auto p = mp_tar.getQuickHullVertsAndFaces(shape);
+        std::vector<vec3<Scalar>> points = p.first;
+		// Compute trace
+		return score(t_1, 0, 1, 0, s_1, s_2);
+		}
+	};
+
 namespace detail
     {
 
