@@ -882,8 +882,91 @@ class Targeted2ShapeMove<ShapeConvexPolyhedron> : public TargetedShapeMoveBase<S
 		detail::MassProperties<ShapeConvexPolyhedron> mp_tar(shape);
 		auto p = mp_tar.getQuickHullVertsAndFaces(shape);
         std::vector<vec3<Scalar>> points = p.first;
+		std::vector<Scalar> allR; 
+
+		for (unsigned int i = 0; i < points.size(); i++)
+		{
+			allR.push_back(sqrt(pow(points[i][0], 2) + pow(points[i][1], 2) + pow(points[i][2], 2)));
+			// for (unsigned int j = 0; j < 3; j++)
+			// {
+				// std::cout << points[i][j];
+			// }
+		}
+
+
+		Scalar Rc = max_element(allR);
+		// std::cout << Rc;
+		return score(t_1, 0, Rc, 0, s_1, s_2);
+		}
+
+	private:
+
+	Scalar max_element(std::vector<Scalar> arr)
+		{
+		Scalar largest = arr[0];
+		for (unsigned int i = 1; i < arr.size(); i++)
+			{
+			if (largest < arr[i]) {
+				largest = arr[i];
+			}
+			}
+		return largest;
+		}
+	};
+
+template<class Shape> class Targeted1A2ShapeMove : public TargetedShapeMoveBase<Shape>
+	{
+	};
+
+template<>
+class Targeted1A2ShapeMove<ShapeConvexPolyhedron> : public TargetedShapeMoveBase<ShapeConvexPolyhedron>
+	{
+	public:
+	typedef typename ShapeConvexPolyhedron::param_type param_type;
+
+	Targeted1A2ShapeMove(std::shared_ptr<SystemDefinition> sysdef,
+					   std::shared_ptr<IntegratorHPMCMono<ShapeConvexPolyhedron>> mc)
+		: TargetedShapeMoveBase<ShapeConvexPolyhedron>(sysdef, mc)
+		{
+		this->m_centroids.resize(this->m_ntypes, vec3<Scalar>(0, 0, 0));
+		initializeMassProperties();
+		}
+
+	// Target is Tr(I) and R_c, in that order
+	Scalar computeScore(const typename ShapeConvexPolyhedron::param_type& shape,
+						Scalar t_1, Scalar t_2,
+						Scalar s_1, Scalar s_2)
+		{
+		detail::MassProperties<ShapeConvexPolyhedron> mp_tar(shape);
+		std::vector<Scalar> inert = mp_tar.getInertiaTensor();
 		// Compute trace
-		return score(t_1, 0, 1, 0, s_1, s_2);
+		Scalar trI = inert[0] + inert[1] + inert[2];
+		// Compute R_c
+		auto p = mp_tar.getQuickHullVertsAndFaces(shape);
+        std::vector<vec3<Scalar>> points = p.first;
+		std::vector<Scalar> allR; 
+
+		for (unsigned int i = 0; i < points.size(); i++)
+		{
+			allR.push_back(sqrt(pow(points[i][0], 2) + pow(points[i][1], 2) + pow(points[i][2], 2)));
+		}
+
+		Scalar Rc = max_element(allR);
+		return score(t_1, t_2, trI, Rc, s_1, s_2);
+		}
+
+	private:
+
+	Scalar max_element(std::vector<Scalar> arr)
+		{
+		Scalar largest = arr[0];
+		for (unsigned int i = 1; i < arr.size(); i++)
+			{
+			if (largest < arr[i]) {
+				largest = arr[i];
+			}
+			}
+		return largest;
 		}
 	};
 
@@ -974,6 +1057,62 @@ inline void export_Targeted1ShapeMove(pybind11::module& m, const std::string& na
 		.def_property("scale_2",
 					  &Targeted1ShapeMove<Shape>::getScale2,
 					  &Targeted1ShapeMove<Shape>::setScale2);
+	}
+
+template<class Shape>
+inline void export_Targeted2ShapeMove(pybind11::module& m, const std::string& name)
+	{
+	pybind11::class_<Targeted2ShapeMove<Shape>,
+					 ShapeMoveBase<Shape>,
+					 std::shared_ptr<Targeted2ShapeMove<Shape>>>(m, name.c_str())
+		.def_property("vertex_move_probability",
+					  &Targeted2ShapeMove<Shape>::getMoveProbability,
+					  &Targeted2ShapeMove<Shape>::setMoveProbability)
+		.def(pybind11::init<std::shared_ptr<SystemDefinition>,
+							std::shared_ptr<IntegratorHPMCMono<Shape>>>())
+		.def_property("move_score",
+					  &Targeted2ShapeMove<Shape>::getMoveScore,
+					  &Targeted2ShapeMove<Shape>::setMoveScore)
+		.def_property("target_1",
+					  &Targeted2ShapeMove<Shape>::getTarget1,
+					  &Targeted2ShapeMove<Shape>::setTarget1)
+		.def_property("target_2",
+					  &Targeted2ShapeMove<Shape>::getTarget2,
+					  &Targeted2ShapeMove<Shape>::setTarget2)
+		.def_property("scale_1",
+					  &Targeted2ShapeMove<Shape>::getScale1,
+					  &Targeted2ShapeMove<Shape>::setScale1)
+		.def_property("scale_2",
+					  &Targeted2ShapeMove<Shape>::getScale2,
+					  &Targeted2ShapeMove<Shape>::setScale2);
+	}
+
+template<class Shape>
+inline void export_Targeted1A2ShapeMove(pybind11::module& m, const std::string& name)
+	{
+	pybind11::class_<Targeted1A2ShapeMove<Shape>,
+					 ShapeMoveBase<Shape>,
+					 std::shared_ptr<Targeted1A2ShapeMove<Shape>>>(m, name.c_str())
+		.def_property("vertex_move_probability",
+					  &Targeted1A2ShapeMove<Shape>::getMoveProbability,
+					  &Targeted1A2ShapeMove<Shape>::setMoveProbability)
+		.def(pybind11::init<std::shared_ptr<SystemDefinition>,
+							std::shared_ptr<IntegratorHPMCMono<Shape>>>())
+		.def_property("move_score",
+					  &Targeted1A2ShapeMove<Shape>::getMoveScore,
+					  &Targeted1A2ShapeMove<Shape>::setMoveScore)
+		.def_property("target_1",
+					  &Targeted1A2ShapeMove<Shape>::getTarget1,
+					  &Targeted1A2ShapeMove<Shape>::setTarget1)
+		.def_property("target_2",
+					  &Targeted1A2ShapeMove<Shape>::getTarget2,
+					  &Targeted1A2ShapeMove<Shape>::setTarget2)
+		.def_property("scale_1",
+					  &Targeted1A2ShapeMove<Shape>::getScale1,
+					  &Targeted1A2ShapeMove<Shape>::setScale1)
+		.def_property("scale_2",
+					  &Targeted1A2ShapeMove<Shape>::getScale2,
+					  &Targeted1A2ShapeMove<Shape>::setScale2);
 	}
 
     } // namespace detail
