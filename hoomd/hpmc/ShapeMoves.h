@@ -882,35 +882,18 @@ class Targeted2ShapeMove<ShapeConvexPolyhedron> : public TargetedShapeMoveBase<S
 		detail::MassProperties<ShapeConvexPolyhedron> mp_tar(shape);
 		auto p = mp_tar.getQuickHullVertsAndFaces(shape);
         std::vector<vec3<Scalar>> points = p.first;
-		std::vector<Scalar> allR; 
+		Scalar Rc = 0;
+		vec3<Scalar> centroid = mp_tar.getCenterOfMass();
 
 		for (unsigned int i = 0; i < points.size(); i++)
 		{
-			allR.push_back(sqrt(pow(points[i][0], 2) + pow(points[i][1], 2) + pow(points[i][2], 2)));
-			// for (unsigned int j = 0; j < 3; j++)
-			// {
-				// std::cout << points[i][j];
-			// }
+			Rc = fmax(Rc, sqrt(pow(points[i][0] - centroid.x, 2) 
+				 			 + pow(points[i][1] - centroid.y, 2) 
+				 			 + pow(points[i][2] - centroid.z, 2)));
 		}
-
-
-		Scalar Rc = max_element(allR);
-		// std::cout << Rc;
+		// std::cout << "Centroid" << "[" << centroid.x << " " << centroid.y << " " << centroid.z << "]\n";
+		// std::cout << "R_c:" << Rc << "\n";
 		return score(t_1, 0, Rc, 0, s_1, s_2);
-		}
-
-	private:
-
-	Scalar max_element(std::vector<Scalar> arr)
-		{
-		Scalar largest = arr[0];
-		for (unsigned int i = 1; i < arr.size(); i++)
-			{
-			if (largest < arr[i]) {
-				largest = arr[i];
-			}
-			}
-		return largest;
 		}
 	};
 
@@ -944,15 +927,102 @@ class Targeted1A2ShapeMove<ShapeConvexPolyhedron> : public TargetedShapeMoveBase
 		// Compute R_c
 		auto p = mp_tar.getQuickHullVertsAndFaces(shape);
         std::vector<vec3<Scalar>> points = p.first;
-		std::vector<Scalar> allR; 
+		Scalar Rc = 0;
+		vec3<Scalar> centroid = mp_tar.getCenterOfMass();
 
 		for (unsigned int i = 0; i < points.size(); i++)
 		{
-			allR.push_back(sqrt(pow(points[i][0], 2) + pow(points[i][1], 2) + pow(points[i][2], 2)));
+			Rc = fmax(Rc, sqrt(pow(points[i][0] - centroid.x, 2) 
+				 			 + pow(points[i][1] - centroid.y, 2) 
+				 			 + pow(points[i][2] - centroid.z, 2)));
+		}
+		return score(t_1, t_2, trI, Rc, s_1, s_2);
+		}
+	};
+
+template<class Shape> class Targeted3ShapeMove : public TargetedShapeMoveBase<Shape>
+	{
+	};
+
+template<>
+class Targeted3ShapeMove<ShapeConvexPolyhedron> : public TargetedShapeMoveBase<ShapeConvexPolyhedron>
+	{
+	public:
+	typedef typename ShapeConvexPolyhedron::param_type param_type;
+
+	Targeted3ShapeMove(std::shared_ptr<SystemDefinition> sysdef,
+					   std::shared_ptr<IntegratorHPMCMono<ShapeConvexPolyhedron>> mc)
+		: TargetedShapeMoveBase<ShapeConvexPolyhedron>(sysdef, mc)
+		{
+		this->m_centroids.resize(this->m_ntypes, vec3<Scalar>(0, 0, 0));
+		initializeMassProperties();
 		}
 
-		Scalar Rc = max_element(allR);
-		return score(t_1, t_2, trI, Rc, s_1, s_2);
+	// Target is R_i
+	Scalar computeScore(const typename ShapeConvexPolyhedron::param_type& shape,
+						Scalar t_1, Scalar t_2,
+						Scalar s_1, Scalar s_2)
+		{
+		detail::MassProperties<ShapeConvexPolyhedron> mp_tar(shape);
+		vec3<Scalar> centroid = mp_tar.getCenterOfMass();
+		// Compute R_i
+		Scalar Ri = -666;
+		std::vector<std::vector<Scalar>> equations = mp_tar.getEquations();
+		for (unsigned int i = 0; i < equations.size(); i++)
+		{
+			// std::cout << "[" << equations[i][0] << " " << equations[i][1] << " " << equations[i][2] << " " << equations[i][3] << "]\n";
+			// Since Ri is negative. Min is negative of max
+			Ri = fmax(Ri, mp_tar.getPointPlaneDistance(centroid, equations[i]));	
+		}
+		// std::cout << "Centroid" << "[" << centroid.x << " " << centroid.y << " " << centroid.z << "]\n";
+		// std::cout << "R_i:" << -Ri << "\n";
+		return score(t_1, 0, -Ri, 0, s_1, s_2);
+		}
+	};
+
+template<class Shape> class Targeted2A3ShapeMove : public TargetedShapeMoveBase<Shape>
+	{
+	};
+
+template<>
+class Targeted2A3ShapeMove<ShapeConvexPolyhedron> : public TargetedShapeMoveBase<ShapeConvexPolyhedron>
+	{
+	public:
+	typedef typename ShapeConvexPolyhedron::param_type param_type;
+
+	Targeted2A3ShapeMove(std::shared_ptr<SystemDefinition> sysdef,
+					   std::shared_ptr<IntegratorHPMCMono<ShapeConvexPolyhedron>> mc)
+		: TargetedShapeMoveBase<ShapeConvexPolyhedron>(sysdef, mc)
+		{
+		this->m_centroids.resize(this->m_ntypes, vec3<Scalar>(0, 0, 0));
+		initializeMassProperties();
+		}
+
+	// Target is R_c/R_i
+	Scalar computeScore(const typename ShapeConvexPolyhedron::param_type& shape,
+						Scalar t_1, Scalar t_2,
+						Scalar s_1, Scalar s_2)
+		{
+		detail::MassProperties<ShapeConvexPolyhedron> mp_tar(shape);
+		// Compute R_c
+		auto p = mp_tar.getQuickHullVertsAndFaces(shape);
+        std::vector<vec3<Scalar>> points = p.first;
+		Scalar Rc = 0;
+		vec3<Scalar> centroid = mp_tar.getCenterOfMass();
+		for (unsigned int i = 0; i < points.size(); i++)
+		{
+			Rc = fmax(Rc, sqrt(pow(points[i][0] - centroid.x, 2) 
+				 			 + pow(points[i][1] - centroid.y, 2) 
+				 			 + pow(points[i][2] - centroid.z, 2)));
+		}
+		// Compute R_i
+		Scalar Ri = -666;
+		std::vector<std::vector<Scalar>> equations = mp_tar.getEquations();
+		for (unsigned int i = 0; i < equations.size(); i++)
+		{
+			Ri = fmax(Ri, mp_tar.getPointPlaneDistance(centroid, equations[i]));	
+		}
+		return score(t_1, 0, -Rc/Ri, 0, s_1, s_2);
 		}
 
 	private:
@@ -1113,6 +1183,62 @@ inline void export_Targeted1A2ShapeMove(pybind11::module& m, const std::string& 
 		.def_property("scale_2",
 					  &Targeted1A2ShapeMove<Shape>::getScale2,
 					  &Targeted1A2ShapeMove<Shape>::setScale2);
+	}
+
+template<class Shape>
+inline void export_Targeted3ShapeMove(pybind11::module& m, const std::string& name)
+	{
+	pybind11::class_<Targeted3ShapeMove<Shape>,
+					 ShapeMoveBase<Shape>,
+					 std::shared_ptr<Targeted3ShapeMove<Shape>>>(m, name.c_str())
+		.def_property("vertex_move_probability",
+					  &Targeted3ShapeMove<Shape>::getMoveProbability,
+					  &Targeted3ShapeMove<Shape>::setMoveProbability)
+		.def(pybind11::init<std::shared_ptr<SystemDefinition>,
+							std::shared_ptr<IntegratorHPMCMono<Shape>>>())
+		.def_property("move_score",
+					  &Targeted3ShapeMove<Shape>::getMoveScore,
+					  &Targeted3ShapeMove<Shape>::setMoveScore)
+		.def_property("target_1",
+					  &Targeted3ShapeMove<Shape>::getTarget1,
+					  &Targeted3ShapeMove<Shape>::setTarget1)
+		.def_property("target_2",
+					  &Targeted3ShapeMove<Shape>::getTarget2,
+					  &Targeted3ShapeMove<Shape>::setTarget2)
+		.def_property("scale_1",
+					  &Targeted3ShapeMove<Shape>::getScale1,
+					  &Targeted3ShapeMove<Shape>::setScale1)
+		.def_property("scale_2",
+					  &Targeted3ShapeMove<Shape>::getScale2,
+					  &Targeted3ShapeMove<Shape>::setScale2);
+	}
+
+template<class Shape>
+inline void export_Targeted2A3ShapeMove(pybind11::module& m, const std::string& name)
+	{
+	pybind11::class_<Targeted2A3ShapeMove<Shape>,
+					 ShapeMoveBase<Shape>,
+					 std::shared_ptr<Targeted2A3ShapeMove<Shape>>>(m, name.c_str())
+		.def_property("vertex_move_probability",
+					  &Targeted2A3ShapeMove<Shape>::getMoveProbability,
+					  &Targeted2A3ShapeMove<Shape>::setMoveProbability)
+		.def(pybind11::init<std::shared_ptr<SystemDefinition>,
+							std::shared_ptr<IntegratorHPMCMono<Shape>>>())
+		.def_property("move_score",
+					  &Targeted2A3ShapeMove<Shape>::getMoveScore,
+					  &Targeted2A3ShapeMove<Shape>::setMoveScore)
+		.def_property("target_1",
+					  &Targeted2A3ShapeMove<Shape>::getTarget1,
+					  &Targeted2A3ShapeMove<Shape>::setTarget1)
+		.def_property("target_2",
+					  &Targeted2A3ShapeMove<Shape>::getTarget2,
+					  &Targeted2A3ShapeMove<Shape>::setTarget2)
+		.def_property("scale_1",
+					  &Targeted2A3ShapeMove<Shape>::getScale1,
+					  &Targeted2A3ShapeMove<Shape>::setScale1)
+		.def_property("scale_2",
+					  &Targeted2A3ShapeMove<Shape>::getScale2,
+					  &Targeted2A3ShapeMove<Shape>::setScale2);
 	}
 
     } // namespace detail

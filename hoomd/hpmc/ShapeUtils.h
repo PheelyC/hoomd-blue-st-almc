@@ -236,6 +236,34 @@ template<> class MassProperties<ShapeConvexPolyhedron> : public MassPropertiesBa
         m_inertia[5] = -(intg[9] - m_volume * cxz);
         } // end MassProperties<ShapeConvexPolyhedron>::compute()
 
+	// To calculate other shape parameters, need plane equations
+	std::vector<std::vector<Scalar>> getEquations()
+		{
+		std::vector<std::vector<Scalar>> equations;
+		// For all faces in the shape
+        for (unsigned int t = 0; t < faces.size(); t++)
+			{
+			vec3<Scalar> normal = cross(points[faces[t][0]] - points[faces[t][1]], 
+										points[faces[t][2]] - points[faces[t][1]]);
+			// Normalized the normal vector
+			normal /= sqrt(pow(normal[0],2) + pow(normal[1],2) + pow(normal[2],2));
+			// d in plane equation
+			Scalar d = -dot(normal, points[faces[t][0]]);
+			// Append to equations	
+			equations.push_back({normal.x, normal.y, normal.z, d});
+			}
+		return equations;
+		}
+
+	// Compute the distance between a point and a plane
+	Scalar getPointPlaneDistance(vec3<Scalar> point,
+							     std::vector<Scalar> equation)
+		{
+		vec3<Scalar> normal = {equation[0], equation[1], equation[2]};
+		Scalar inner_prod = dot(point, normal);
+		return inner_prod + equation[3];
+		}
+
     protected:
     std::vector<vec3<Scalar>> points;
     std::vector<std::vector<unsigned int>> faces;
