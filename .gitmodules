@@ -26,3 +26,6 @@
 [submodule "sphinx-doc/tutorial"]
 	path = sphinx-doc/tutorial
 	url = https://github.com/glotzerlab/hoomd-examples
+[submodule "hoomd/extern/clustering"]
+	path = hoomd/extern/clustering
+	url = git@github.com:Lallapallooza/clustering.git
