@@ -29,3 +29,6 @@
 [submodule "hoomd/extern/clustering"]
 	path = hoomd/extern/clustering
 	url = git@github.com:Lallapallooza/clustering.git
+[submodule "hoomd/extern/hopscotch-map"]
+	path = hoomd/extern/hopscotch-map
+	url = https://github.com/Tessil/hopscotch-map.git
