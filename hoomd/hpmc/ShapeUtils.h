@@ -264,6 +264,22 @@ template<> class MassProperties<ShapeConvexPolyhedron> : public MassPropertiesBa
 		return inner_prod + equation[3];
 		}
 
+	// Compute a facet area
+	Scalar getFacetArea(unsigned int i_face)
+		{
+		// get vertices of triangle
+		vec3<Scalar> v0, v1, v2; // vertices
+		vec3<Scalar> a1, a2, d;
+		v0 = points[faces[i_face][0]];
+		v1 = points[faces[i_face][1]];
+		v2 = points[faces[i_face][2]];
+		// get edges and cross product of edges
+		a1 = v1 - v0;
+		a2 = v2 - v0;
+		d = cross(a1, a2); // = |a1||a2|sin(theta)
+		return 0.5 * sqrt(dot(d,d));
+		}
+
     protected:
     std::vector<vec3<Scalar>> points;
     std::vector<std::vector<unsigned int>> faces;

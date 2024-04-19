@@ -7,11 +7,14 @@
 #include "GSDHPMCSchema.h"
 #include "Moves.h"
 #include "ShapeUtils.h"
+#include "hoomd/HOOMDMath.h"
 #include "hoomd/extern/quickhull/QuickHull.hpp"
 #include <Eigen/Dense>
 #include <hoomd/Variant.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include "hoomd/extern/clustering/include/clustering/dbscan.h"
+#include "hoomd/hpmc/ShapeConvexPolyhedron.h"
 
 namespace hoomd
     {
@@ -980,17 +983,17 @@ class Targeted3ShapeMove<ShapeConvexPolyhedron> : public TargetedShapeMoveBase<S
 		}
 	};
 
-template<class Shape> class Targeted2A3ShapeMove : public TargetedShapeMoveBase<Shape>
+template<class Shape> class Targeted4ShapeMove : public TargetedShapeMoveBase<Shape>
 	{
 	};
 
 template<>
-class Targeted2A3ShapeMove<ShapeConvexPolyhedron> : public TargetedShapeMoveBase<ShapeConvexPolyhedron>
+class Targeted4ShapeMove<ShapeConvexPolyhedron> : public TargetedShapeMoveBase<ShapeConvexPolyhedron>
 	{
 	public:
 	typedef typename ShapeConvexPolyhedron::param_type param_type;
 
-	Targeted2A3ShapeMove(std::shared_ptr<SystemDefinition> sysdef,
+	Targeted4ShapeMove(std::shared_ptr<SystemDefinition> sysdef,
 					   std::shared_ptr<IntegratorHPMCMono<ShapeConvexPolyhedron>> mc)
 		: TargetedShapeMoveBase<ShapeConvexPolyhedron>(sysdef, mc)
 		{
@@ -1038,6 +1041,252 @@ class Targeted2A3ShapeMove<ShapeConvexPolyhedron> : public TargetedShapeMoveBase
 			}
 		return largest;
 		}
+	};
+
+template<class Shape> class Targeted5ShapeMove : public TargetedShapeMoveBase<Shape>
+	{
+	};
+
+template<>
+class Targeted5ShapeMove<ShapeConvexPolyhedron> : public TargetedShapeMoveBase<ShapeConvexPolyhedron>
+	{
+	public:
+	typedef typename ShapeConvexPolyhedron::param_type param_type;
+
+	Targeted5ShapeMove(std::shared_ptr<SystemDefinition> sysdef,
+					   std::shared_ptr<IntegratorHPMCMono<ShapeConvexPolyhedron>> mc)
+		: TargetedShapeMoveBase<ShapeConvexPolyhedron>(sysdef, mc)
+		{
+		this->m_centroids.resize(this->m_ntypes, vec3<Scalar>(0, 0, 0));
+		initializeMassProperties();
+		}
+
+	// Target is Cos(\theta_d)
+	Scalar computeScore(const typename ShapeConvexPolyhedron::param_type& shape,
+						Scalar t_1, Scalar t_2,
+						Scalar s_1, Scalar s_2)
+		{
+		return score(t_1, 0, cosine_dihedral(shape), 0, s_1, s_2);
+		}
+
+	protected:
+
+	Scalar cosine_dihedral(const typename ShapeConvexPolyhedron::param_type& shape)
+	{
+		detail::MassProperties<ShapeConvexPolyhedron> mp_tar(shape);
+		// Get normal vectors of the faces
+		std::vector<std::vector<Scalar>> equations = mp_tar.getEquations();
+		std::vector<vec3<Scalar>> normals;
+		std::vector<Scalar> sample_weights;
+		for (unsigned int i = 0; i < equations.size(); i++)
+		{
+			normals.push_back({equations[i][0], equations[i][1], equations[i][2]});
+		}
+		// Running DBSCAN
+		NDArray<Scalar, 2> data({normals.size(), 3});
+		// Generate data for DBSCAN
+		for (unsigned int i = 0; i < normals.size(); i++)
+		{
+			sample_weights.push_back(10 * mp_tar.getFacetArea(i));
+			for (unsigned int j = 0; j < 3; j++)
+			{
+				data[i][j] = normals[i][j];
+			}
+		}
+
+		DBSCAN<Scalar> dbscan(data, 0.5, 3, sample_weights);
+		dbscan.run();
+		const auto &labels = dbscan.labels();
+		// std::cout << "Labels size: " << labels.size() << std::endl;
+		// std::cout << "Number of clusters: " << dbscan.nClusters() << std::endl;
+		// std::cout << "\n[";
+		// for (unsigned int j = 0; j < labels.size(); j++)
+			// std::cout << labels[j] << " ";
+		// std::cout << "]\n";
+
+		// Get faces
+		std::vector<std::vector<unsigned int>> faces;
+		auto p = mp_tar.getQuickHullVertsAndFaces(shape);
+        faces = p.second;
+		// Scalar area_cutoff = 0.02;
+		int n_clusters = static_cast<unsigned int>(dbscan.nClusters());
+
+		// Compute clustered weighted average normals
+		std::vector<vec3<Scalar>> avgs_normal;
+		std::vector<Scalar> weights;
+		if (n_clusters > 2)
+		{
+			for (int i = 0; i < n_clusters; i++)
+			{
+				std::vector<vec3<Scalar>> tmp_norms;
+				std::vector<Scalar> tmp_weights;
+				Scalar weight_sum = 0.0;
+				for (unsigned int j = 0; j < labels.size(); j++)
+				{
+					if (i == labels[j])
+					{
+						tmp_norms.push_back(normals[j]);
+						Scalar tmp_fA =	mp_tar.getFacetArea(i);
+						tmp_weights.push_back(tmp_fA);
+						weight_sum += tmp_fA;
+						// if (tmp_fA > area_cutoff)
+						// {
+							// tmp_weights.push_back(tmp_fA);
+							// weight_sum += tmp_fA;
+						// }
+						// else
+						// {
+							// tmp_weights.push_back(0.0);
+						// }
+					}
+				}
+				avgs_normal.push_back(weighted_avg_normals(tmp_norms, tmp_weights));
+				weights.push_back(weight_sum);
+			}
+		}
+		else // When not enough clusters are found
+		{
+			avgs_normal = normals;
+			Scalar area_cutoff = 0.02;
+			for (unsigned int i = 0; i < avgs_normal.size(); i++)
+			{
+				Scalar tmp_fA = mp_tar.getFacetArea(i);
+				if (tmp_fA > area_cutoff)
+				{
+					weights.push_back(tmp_fA);
+				}
+				else
+				{
+					weights.push_back(0.0);
+				}
+			}
+		}
+		// Compute Cosine of dihedral
+		Scalar delta = 0.15;
+		std::vector<Scalar> cos_d;
+		std::vector<Scalar> area_weight;
+		for (long unsigned int i = 0; i < avgs_normal.size(); i++)
+		{
+			for (long unsigned int j = 0; j < avgs_normal.size(); j++)
+			{
+				Scalar tmp_cosd;
+				if (i < j)
+				{
+					tmp_cosd = dot(avgs_normal[i], avgs_normal[j]) / \
+								   sqrt(dot(avgs_normal[i], avgs_normal[i]) * \
+								   dot(avgs_normal[j], avgs_normal[j]));
+					// Filter out opposite normals
+					if (tmp_cosd > -1.0+delta)
+					{
+						cos_d.push_back(abs(tmp_cosd));
+						area_weight.push_back(weights[i] + weights[j]);
+					}
+					else
+					{
+						cos_d.push_back(0.01);
+						area_weight.push_back(0.0);
+					}
+				}
+			}
+		}
+
+		// Any cos_d > delta
+		long unsigned int count_accept = std::count_if(cos_d.begin(), cos_d.end(),\
+									 				   [delta](Scalar i) {return i > delta;});
+		if (count_accept > 0)
+		{
+			for (unsigned int i = 0; i < cos_d.size(); i++)
+			{
+				if (cos_d[i] < delta)
+					area_weight[i] = 0.0;
+			}
+		}
+		// Check cos_d and weights (very informative for debugging)
+		// std::cout << '[';
+		// for (unsigned int i = 0; i < cos_d.size(); i++)
+		// {
+			// std::cout << cos_d[i] << " ";
+		// }
+		// std::cout << ']';
+		// std::cout << std::endl << std::endl;
+		// std::cout << '[';
+		// for (unsigned int i = 0; i < cos_d.size(); i++)
+		// {
+			// std::cout << area_weight[i] << " ";
+		// }
+		// std::cout << ']';
+		
+		// Get area-weighted cos_d
+		std::cout << "\nCos_d avg: " << weighted_avg(cos_d, area_weight) << std::endl;
+		return weighted_avg(cos_d, area_weight);
+	}
+
+	vec3<Scalar> weighted_avg_normals(std::vector<vec3<Scalar>> norms,
+									  std::vector<Scalar> weights)
+		{
+		vec3<Scalar> norm_tmp = {0.0,0.0,0.0};
+		Scalar weight_sum = 0.0;
+		for (unsigned int  i = 0; i < norms.size(); i++)
+		{
+			for (unsigned int j = 0; j < 3; j++)
+			{
+				norm_tmp[j] += weights[i] * norms[i][j];	
+			}
+			weight_sum += weights[i];
+		}
+		for (unsigned int j = 0; j < 3; j++)
+		{
+			norm_tmp[j] = norm_tmp[j] / weight_sum;	
+		}
+		return norm_tmp;	
+		}
+
+	Scalar weighted_avg(std::vector<Scalar> vals, std::vector<Scalar> weights)
+		{
+		Scalar avg = 0.0;
+		Scalar sum_weight = 0.0;
+		for (unsigned int i = 0; i < vals.size(); i++)
+		{
+			avg += weights[i] * vals[i];
+			sum_weight += weights[i];
+		}
+		return avg / sum_weight; 
+		}
+
+	};
+
+template<class Shape> class Targeted1A5ShapeMove : public TargetedShapeMoveBase<Shape>
+	{
+	};
+
+template<>
+class Targeted1A5ShapeMove<ShapeConvexPolyhedron> : public Targeted5ShapeMove<ShapeConvexPolyhedron>
+	{
+	public:
+	typedef typename ShapeConvexPolyhedron::param_type param_type;
+
+	Targeted1A5ShapeMove(std::shared_ptr<SystemDefinition> sysdef,
+					   std::shared_ptr<IntegratorHPMCMono<ShapeConvexPolyhedron>> mc)
+		: Targeted5ShapeMove<ShapeConvexPolyhedron>(sysdef, mc)
+		{
+		this->m_centroids.resize(this->m_ntypes, vec3<Scalar>(0, 0, 0));
+		initializeMassProperties();
+		}
+
+	// Target is Cos(\theta_d) and Tr(I)
+	Scalar computeScore(const typename ShapeConvexPolyhedron::param_type& shape,
+						Scalar t_1, Scalar t_2,
+						Scalar s_1, Scalar s_2)
+		{
+		detail::MassProperties<ShapeConvexPolyhedron> mp_tar(shape);
+		std::vector<Scalar> inert = mp_tar.getInertiaTensor();
+		// Compute trace
+		return score(t_1, t_2,\
+					 inert[0]+inert[1]+inert[2],
+					 cosine_dihedral(shape),\
+					 s_1, s_2);
+		}
+
 	};
 
 namespace detail
@@ -1214,31 +1463,87 @@ inline void export_Targeted3ShapeMove(pybind11::module& m, const std::string& na
 	}
 
 template<class Shape>
-inline void export_Targeted2A3ShapeMove(pybind11::module& m, const std::string& name)
+inline void export_Targeted4ShapeMove(pybind11::module& m, const std::string& name)
 	{
-	pybind11::class_<Targeted2A3ShapeMove<Shape>,
+	pybind11::class_<Targeted4ShapeMove<Shape>,
 					 ShapeMoveBase<Shape>,
-					 std::shared_ptr<Targeted2A3ShapeMove<Shape>>>(m, name.c_str())
+					 std::shared_ptr<Targeted4ShapeMove<Shape>>>(m, name.c_str())
 		.def_property("vertex_move_probability",
-					  &Targeted2A3ShapeMove<Shape>::getMoveProbability,
-					  &Targeted2A3ShapeMove<Shape>::setMoveProbability)
+					  &Targeted4ShapeMove<Shape>::getMoveProbability,
+					  &Targeted4ShapeMove<Shape>::setMoveProbability)
 		.def(pybind11::init<std::shared_ptr<SystemDefinition>,
 							std::shared_ptr<IntegratorHPMCMono<Shape>>>())
 		.def_property("move_score",
-					  &Targeted2A3ShapeMove<Shape>::getMoveScore,
-					  &Targeted2A3ShapeMove<Shape>::setMoveScore)
+					  &Targeted4ShapeMove<Shape>::getMoveScore,
+					  &Targeted4ShapeMove<Shape>::setMoveScore)
 		.def_property("target_1",
-					  &Targeted2A3ShapeMove<Shape>::getTarget1,
-					  &Targeted2A3ShapeMove<Shape>::setTarget1)
+					  &Targeted4ShapeMove<Shape>::getTarget1,
+					  &Targeted4ShapeMove<Shape>::setTarget1)
 		.def_property("target_2",
-					  &Targeted2A3ShapeMove<Shape>::getTarget2,
-					  &Targeted2A3ShapeMove<Shape>::setTarget2)
+					  &Targeted4ShapeMove<Shape>::getTarget2,
+					  &Targeted4ShapeMove<Shape>::setTarget2)
 		.def_property("scale_1",
-					  &Targeted2A3ShapeMove<Shape>::getScale1,
-					  &Targeted2A3ShapeMove<Shape>::setScale1)
+					  &Targeted4ShapeMove<Shape>::getScale1,
+					  &Targeted4ShapeMove<Shape>::setScale1)
 		.def_property("scale_2",
-					  &Targeted2A3ShapeMove<Shape>::getScale2,
-					  &Targeted2A3ShapeMove<Shape>::setScale2);
+					  &Targeted4ShapeMove<Shape>::getScale2,
+					  &Targeted4ShapeMove<Shape>::setScale2);
+	}
+
+template<class Shape>
+inline void export_Targeted5ShapeMove(pybind11::module& m, const std::string& name)
+	{
+	pybind11::class_<Targeted5ShapeMove<Shape>,
+					 ShapeMoveBase<Shape>,
+					 std::shared_ptr<Targeted5ShapeMove<Shape>>>(m, name.c_str())
+		.def_property("vertex_move_probability",
+					  &Targeted5ShapeMove<Shape>::getMoveProbability,
+					  &Targeted5ShapeMove<Shape>::setMoveProbability)
+		.def(pybind11::init<std::shared_ptr<SystemDefinition>,
+							std::shared_ptr<IntegratorHPMCMono<Shape>>>())
+		.def_property("move_score",
+					  &Targeted5ShapeMove<Shape>::getMoveScore,
+					  &Targeted5ShapeMove<Shape>::setMoveScore)
+		.def_property("target_1",
+					  &Targeted5ShapeMove<Shape>::getTarget1,
+					  &Targeted5ShapeMove<Shape>::setTarget1)
+		.def_property("target_2",
+					  &Targeted5ShapeMove<Shape>::getTarget2,
+					  &Targeted5ShapeMove<Shape>::setTarget2)
+		.def_property("scale_1",
+					  &Targeted5ShapeMove<Shape>::getScale1,
+					  &Targeted5ShapeMove<Shape>::setScale1)
+		.def_property("scale_2",
+					  &Targeted5ShapeMove<Shape>::getScale2,
+					  &Targeted5ShapeMove<Shape>::setScale2);
+	}
+
+template<class Shape>
+inline void export_Targeted1A5ShapeMove(pybind11::module& m, const std::string& name)
+	{
+	pybind11::class_<Targeted1A5ShapeMove<Shape>,
+					 ShapeMoveBase<Shape>,
+					 std::shared_ptr<Targeted1A5ShapeMove<Shape>>>(m, name.c_str())
+		.def_property("vertex_move_probability",
+					  &Targeted1A5ShapeMove<Shape>::getMoveProbability,
+					  &Targeted1A5ShapeMove<Shape>::setMoveProbability)
+		.def(pybind11::init<std::shared_ptr<SystemDefinition>,
+							std::shared_ptr<IntegratorHPMCMono<Shape>>>())
+		.def_property("move_score",
+					  &Targeted1A5ShapeMove<Shape>::getMoveScore,
+					  &Targeted1A5ShapeMove<Shape>::setMoveScore)
+		.def_property("target_1",
+					  &Targeted1A5ShapeMove<Shape>::getTarget1,
+					  &Targeted1A5ShapeMove<Shape>::setTarget1)
+		.def_property("target_2",
+					  &Targeted1A5ShapeMove<Shape>::getTarget2,
+					  &Targeted1A5ShapeMove<Shape>::setTarget2)
+		.def_property("scale_1",
+					  &Targeted1A5ShapeMove<Shape>::getScale1,
+					  &Targeted1A5ShapeMove<Shape>::setScale1)
+		.def_property("scale_2",
+					  &Targeted1A5ShapeMove<Shape>::getScale2,
+					  &Targeted1A5ShapeMove<Shape>::setScale2);
 	}
 
     } // namespace detail

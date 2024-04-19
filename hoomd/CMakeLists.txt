@@ -276,6 +276,7 @@ target_include_directories(_hoomd PUBLIC
 target_include_directories(_hoomd PUBLIC
                                   $<BUILD_INTERFACE:${HOOMD_BINARY_DIR}/hoomd/include>)
 
+
 # specify required definitions
 target_compile_definitions(_hoomd PUBLIC _REENTRANT EIGEN_MPL2_ONLY)
 target_compile_definitions(_hoomd PUBLIC HOOMD_SHORTREAL_SIZE=${HOOMD_SHORTREAL_SIZE})
