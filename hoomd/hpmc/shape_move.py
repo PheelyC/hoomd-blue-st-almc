@@ -353,7 +353,9 @@ class Targeted1(ShapeMove):
             target_1=float(target_1),
             target_2=float(target_2),
             scale_1=float(scale_1),
-            scale_2=float(scale_2))
+            scale_2=float(scale_2),
+            param_1=float(0.0),
+            param_2=float(0.0))
         self._param_dict.update(param_dict)
         typeparam_volume = TypeParameter('volume',
                                          type_kind='particle_types',
@@ -364,6 +366,14 @@ class Targeted1(ShapeMove):
     @log(category='scalar', requires_run=False)
     def move_score(self):
         return self._cpp_obj.getMoveScore()
+
+    @log(category='scalar', requires_run=False)
+    def param_1(self):
+        return self._cpp_obj.getParam1()
+
+    @log(category='scalar', requires_run=False)
+    def param_2(self):
+        return self._cpp_obj.getParam2()
 
 class Targeted2(ShapeMove):
     """Apply shape moves on particle vertices with a scoring system
@@ -384,7 +394,9 @@ class Targeted2(ShapeMove):
             target_1=float(target_1),
             target_2=float(target_2),
             scale_1=float(scale_1),
-            scale_2=float(scale_2))
+            scale_2=float(scale_2),
+            param_1=float(0.0),
+            param_2=float(0.0))
         self._param_dict.update(param_dict)
         typeparam_volume = TypeParameter('volume',
                                          type_kind='particle_types',
@@ -395,6 +407,14 @@ class Targeted2(ShapeMove):
     @log(category='scalar', requires_run=False)
     def move_score(self):
         return self._cpp_obj.getMoveScore()
+
+    @log(category='scalar', requires_run=False)
+    def param_1(self):
+        return self._cpp_obj.getParam1()
+
+    @log(category='scalar', requires_run=False)
+    def param_2(self):
+        return self._cpp_obj.getParam2()
 
 class Targeted1A2(ShapeMove):
     """Apply shape moves on particle vertices with a scoring system
@@ -415,7 +435,9 @@ class Targeted1A2(ShapeMove):
             target_1=float(target_1),
             target_2=float(target_2),
             scale_1=float(scale_1),
-            scale_2=float(scale_2))
+            scale_2=float(scale_2),
+            param_1=float(0.0),
+            param_2=float(0.0))
         self._param_dict.update(param_dict)
         typeparam_volume = TypeParameter('volume',
                                          type_kind='particle_types',
@@ -426,6 +448,14 @@ class Targeted1A2(ShapeMove):
     @log(category='scalar', requires_run=False)
     def move_score(self):
         return self._cpp_obj.getMoveScore()
+
+    @log(category='scalar', requires_run=False)
+    def param_1(self):
+        return self._cpp_obj.getParam1()
+
+    @log(category='scalar', requires_run=False)
+    def param_2(self):
+        return self._cpp_obj.getParam2()
 
 class Targeted3(ShapeMove):
     """Apply shape moves on particle vertices with a scoring system
@@ -446,7 +476,9 @@ class Targeted3(ShapeMove):
             target_1=float(target_1),
             target_2=float(target_2),
             scale_1=float(scale_1),
-            scale_2=float(scale_2))
+            scale_2=float(scale_2),
+            param_1=float(0.0),
+            param_2=float(0.0))
         self._param_dict.update(param_dict)
         typeparam_volume = TypeParameter('volume',
                                          type_kind='particle_types',
@@ -457,6 +489,14 @@ class Targeted3(ShapeMove):
     @log(category='scalar', requires_run=False)
     def move_score(self):
         return self._cpp_obj.getMoveScore()
+
+    @log(category='scalar', requires_run=False)
+    def param_1(self):
+        return self._cpp_obj.getParam1()
+
+    @log(category='scalar', requires_run=False)
+    def param_2(self):
+        return self._cpp_obj.getParam2()
 
 class Targeted4(ShapeMove):
     """Apply shape moves on particle vertices with a scoring system
@@ -477,7 +517,9 @@ class Targeted4(ShapeMove):
             target_1=float(target_1),
             target_2=float(target_2),
             scale_1=float(scale_1),
-            scale_2=float(scale_2))
+            scale_2=float(scale_2),
+            param_1=float(0.0),
+            param_2=float(0.0))
         self._param_dict.update(param_dict)
         typeparam_volume = TypeParameter('volume',
                                          type_kind='particle_types',
@@ -488,6 +530,14 @@ class Targeted4(ShapeMove):
     @log(category='scalar', requires_run=False)
     def move_score(self):
         return self._cpp_obj.getMoveScore()
+
+    @log(category='scalar', requires_run=False)
+    def param_1(self):
+        return self._cpp_obj.getParam1()
+
+    @log(category='scalar', requires_run=False)
+    def param_2(self):
+        return self._cpp_obj.getParam2()
 
 class Targeted5(ShapeMove):
     """Apply shape moves on particle vertices with a scoring system
@@ -508,7 +558,9 @@ class Targeted5(ShapeMove):
             target_1=float(target_1),
             target_2=float(target_2),
             scale_1=float(scale_1),
-            scale_2=float(scale_2))
+            scale_2=float(scale_2),
+            param_1=float(0.0),
+            param_2=float(0.0))
         self._param_dict.update(param_dict)
         typeparam_volume = TypeParameter('volume',
                                          type_kind='particle_types',
@@ -519,6 +571,14 @@ class Targeted5(ShapeMove):
     @log(category='scalar', requires_run=False)
     def move_score(self):
         return self._cpp_obj.getMoveScore()
+
+    @log(category='scalar', requires_run=False)
+    def param_1(self):
+        return self._cpp_obj.getParam1()
+
+    @log(category='scalar', requires_run=False)
+    def param_2(self):
+        return self._cpp_obj.getParam2()
 
 class Targeted1A5(ShapeMove):
     """Apply shape moves on particle vertices with a scoring system
@@ -539,7 +599,9 @@ class Targeted1A5(ShapeMove):
             target_1=float(target_1),
             target_2=float(target_2),
             scale_1=float(scale_1),
-            scale_2=float(scale_2))
+            scale_2=float(scale_2),
+            param_1=float(0.0),
+            param_2=float(0.0))
         self._param_dict.update(param_dict)
         typeparam_volume = TypeParameter('volume',
                                          type_kind='particle_types',
@@ -550,3 +612,11 @@ class Targeted1A5(ShapeMove):
     @log(category='scalar', requires_run=False)
     def move_score(self):
         return self._cpp_obj.getMoveScore()
+
+    @log(category='scalar', requires_run=False)
+    def param_1(self):
+        return self._cpp_obj.getParam1()
+
+    @log(category='scalar', requires_run=False)
+    def param_2(self):
+        return self._cpp_obj.getParam2()
