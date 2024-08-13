@@ -726,6 +726,26 @@ template<class Shape> class TargetedShapeMoveBase : public ShapeMoveBase<Shape>
 		return m_scale_2;
 		}
 
+	void setBalance1(Scalar s_1)
+		{
+		m_balance_1 = s_1;
+		}
+
+	Scalar getBalance1()
+		{
+		return m_balance_1;
+		}
+
+	void setBalance2(Scalar s_1)
+		{
+		m_balance_2 = s_1;
+		}
+
+	Scalar getBalance2()
+		{
+		return m_balance_2;
+		}
+
 	Scalar score(Scalar target_1,
 				 Scalar target_2,
 				 Scalar param_1,
@@ -847,6 +867,8 @@ template<class Shape> class TargetedShapeMoveBase : public ShapeMoveBase<Shape>
 	Scalar m_param_2;
 	Scalar m_scale_1;
 	Scalar m_scale_2;
+	Scalar m_balance_1;
+	Scalar m_balance_2;
 	std::vector<Scalar> m_step_size_backup;
 
 	// All the functions that calculate shape parameters
@@ -1280,6 +1302,8 @@ class Targeted1A5ShapeMove<ShapeConvexPolyhedron> : public Targeted5ShapeMove<Sh
 		{
 		this->m_param_1 = traceInertia(shape);
 		this->m_param_2 = cosine_dihedral(shape);
+		setBalance1(pow(m_param_1 - t_1, 2) * s_1);
+		setBalance2(pow(m_param_2 - t_2, 2) * s_2);
 		return score(t_1, t_2,\
 					 m_param_1,
 					 m_param_2,\
@@ -1583,7 +1607,13 @@ inline void export_Targeted1A5ShapeMove(pybind11::module& m, const std::string& 
 					  &Targeted1A5ShapeMove<Shape>::setScale1)
 		.def_property("scale_2",
 					  &Targeted1A5ShapeMove<Shape>::getScale2,
-					  &Targeted1A5ShapeMove<Shape>::setScale2);
+					  &Targeted1A5ShapeMove<Shape>::setScale2)
+		.def_property("balance_1",
+					  &Targeted1A5ShapeMove<Shape>::getBalance1,
+					  &Targeted1A5ShapeMove<Shape>::setBalance1)
+		.def_property("balance_2",
+					  &Targeted1A5ShapeMove<Shape>::getBalance2,
+					  &Targeted1A5ShapeMove<Shape>::setBalance2);
 	}
 
     } // namespace detail

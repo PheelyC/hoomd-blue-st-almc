@@ -601,7 +601,9 @@ class Targeted1A5(ShapeMove):
             scale_1=float(scale_1),
             scale_2=float(scale_2),
             param_1=float(0.0),
-            param_2=float(0.0))
+            param_2=float(0.0),
+            balance_1=float(0.0),
+            balance_2=float(0.0))
         self._param_dict.update(param_dict)
         typeparam_volume = TypeParameter('volume',
                                          type_kind='particle_types',
@@ -620,3 +622,11 @@ class Targeted1A5(ShapeMove):
     @log(category='scalar', requires_run=False)
     def param_2(self):
         return self._cpp_obj.getParam2()
+
+    @log(category='scalar', requires_run=False)
+    def balance_1(self):
+        return self._cpp_obj.getBalance1()
+
+    @log(category='scalar', requires_run=False)
+    def balance_2(self):
+        return self._cpp_obj.getBalance2()
