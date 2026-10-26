@@ -1,5 +1,8 @@
 A fork of [HOOMD-blue](https://glotzerlab.engin.umich.edu/hoomd-blue/) for shape-targeted alchemical Monte Carlo.
 
+## Additional required submodule 
+- [Clustering](https://github.com/Lallapallooza/clustering)
+
 ## Usage
 
 Shape-targeted alchemical MC:
